@@ -15,12 +15,18 @@ body	{
 
 .toolbar	{
 	display:block;
+	margin:20px 10px 0px 0px;
 }
+
+.toolitem	{
+	display:block;
+	padding:0px 0px 40px 10px;
+}
+
 
 canvas	{
 	border:thin black solid;
-	margin:0px 0px 0px 13px;
-	border-collapse:
+	margin:20px 0px 0px 13px;
 }
 
 #upperCanvas	{
@@ -46,11 +52,6 @@ button	{
 .auto-style1 {
 	font-family: Arial, Helvetica, sans-serif;
 	color: #35485B;
-}
-
-.toolbar	{
-	margin-left: 30px;
-	margin-bottom:30px;
 }
 
 #top	{

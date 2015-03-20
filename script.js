@@ -29,7 +29,8 @@ function createPaint(parent) {
 
   panel.appendChild(canvas);
   panel.appendChild(upperCanvas);
-  parent.appendChild(elt("div", null, toolbar, panel));
+  parent.appendChild(elt("div", null, panel));
+  document.getElementById("leftbar").appendChild(toolbar);
 }
 
 var tools = {};
@@ -48,7 +49,7 @@ controls.tool = function(cx, ucx) {
     }
   });
 
-  return elt("span", null, "Tool: ", select);
+  return elt("span", {class: "toolitem"}, "Tool: ", select);
 };
 
 controls.layer = function(cx, ucx, panel) {
@@ -63,7 +64,7 @@ controls.layer = function(cx, ucx, panel) {
     }
   });
 
-  return elt("span", null, "Layer: ", selectLayer);
+  return elt("span", {class: "toolitem"}, "Layer: ", selectLayer);
 };
 
 
@@ -412,7 +413,7 @@ controls.color = function(cx, ucx) {
     ucx.fillStyle = input.value;
     ucx.strokeStyle = input.value;
   });
-  return elt("span", null, "Color: ", input);
+  return elt("span", {class: "toolitem"}, "Color: ", input);
 };
 
 controls.brushSize = function(cx, ucx) {
@@ -426,11 +427,11 @@ controls.brushSize = function(cx, ucx) {
     cx.lineWidth = select.value;
     ucx.lineWidth = select.value;
   });
-  return elt("span", null, "Brush size: ", select);
+  return elt("span", {class: "toolitem"}, "Brush size: ", select);
 };
 
 controls.save = function(cx) {
-  var link = elt("a", {href: "/"}, "Save");
+  var link = elt("a", {href: "/", class: "toolitem"}, "Save your work");
   function update() {
     try {
       link.href = cx.canvas.toDataURL().replace('image/png', 'image/octet-stream');
@@ -471,7 +472,7 @@ controls.openFile = function(cx) {
     });
     reader.readAsDataURL(input.files[0]);
   });
-  return elt("div", null, "Open image: ", input);
+  return elt("div", {class: "toolitem"}, "Open image: ", input);
 };
 
 tools.Text = function(event, cx) {
