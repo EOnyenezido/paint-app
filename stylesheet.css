@@ -8,6 +8,10 @@
 	opacity:0.9;
 }
 
+#share	{
+	margin-top:20px;
+}
+
 body	{
 	background-position:center;
 	background-repeat:no-repeat;
@@ -15,7 +19,7 @@ body	{
 
 .toolbar	{
 	display:block;
-	margin:20px 10px 0px 0px;
+	margin:50px 10px 0px 0px;
 }
 
 .toolitem	{
@@ -98,4 +102,22 @@ button	{
     clear:both;
     display:block;
     border-top:thin silver solid;
+}
+
+.auto-style2 {
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: large;
+	color: #35485B;
+	margin:0px 0px 0px 10px;
+}
+.auto-style3 {
+	font-family: Cambria, Cochin, Georgia, Times, "Times New Roman", serif;
+	font-style: italic;
+	font-size: medium;
+	color: #35485B;
+	font-weight: normal;
+}
+
+#clear	{
+	margin-left:20px;
 }

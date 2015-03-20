@@ -1,9 +1,9 @@
-﻿function elt(name, attributes) {
+﻿function makeElement(name, attributes) { //function to create elements and set their attribute
   var node = document.createElement(name);
   if (attributes) {
-    for (var attr in attributes)
-      if (attributes.hasOwnProperty(attr))
-        node.setAttribute(attr, attributes[attr]);
+    for (var item in attributes)
+      if (attributes.hasOwnProperty(item))
+        node.setAttribute(item, attributes[item]);
   }
   for (var i = 2; i < arguments.length; i++) {
     var child = arguments[i];
@@ -14,33 +14,32 @@
   return node;
 }
 
-var controls = {};
-var panel = elt("div", {class: "picturepanel"});
+var controls = {}; //object that stores my controls
+var panel = makeElement("div", {class: "picturepanel"});
 
-function createPaint(parent) {
-  var canvas = elt("canvas", {class:'lowerCanvas', width: 900, height: 500});
+function startPainting(position) {
+  var canvas = makeElement("canvas", {class:'lowerCanvas', width: 900, height: 500}); //main canvas
   var cx = canvas.getContext("2d");
-  var upperCanvas = elt("canvas", {id:'upperCanvas', width: 900, height: 500});
+  var upperCanvas = makeElement("canvas", {id:'upperCanvas', width: 900, height: 500});  //preview canvas
   var ucx = upperCanvas.getContext("2d");
-  //var cx = ucx;
-  var toolbar = elt("div", {class: "toolbar"});
+  var toolbar = makeElement("div", {class: "toolbar"}); //my tools
   for (var name in controls)
     toolbar.appendChild(controls[name](cx, ucx));
 
   panel.appendChild(canvas);
   panel.appendChild(upperCanvas);
-  parent.appendChild(elt("div", null, panel));
+  position.appendChild(makeElement("div", null, panel));
   document.getElementById("leftbar").appendChild(toolbar);
 }
 
 var tools = {};
 
-var layers = {}
+var layers = {};
 
 controls.tool = function(cx, ucx) {
-  var select = elt("select");
+  var select = makeElement("select");
   for (var name in tools)
-    select.appendChild(elt("option", null, name));
+    select.appendChild(makeElement("option", null, name));
 
   ucx.canvas.addEventListener("mousedown", function(event) {
     if (event.which == 1) {
@@ -49,46 +48,18 @@ controls.tool = function(cx, ucx) {
     }
   });
 
-  return elt("span", {class: "toolitem"}, "Tool: ", select);
+  return makeElement("span", {class: "toolitem"}, "Tool: ", select);
 };
-
-controls.layer = function(cx, ucx, panel) {
-  var selectLayer = elt("select");
-  for (var name in layers)
-    selectLayer.appendChild(elt("option", null, name));
-
-  ucx.canvas.addEventListener("mousedown", function(event) {
-    if (event.which == 1) {
-      layers[selectLayer.value](event, cx, ucx, panel);
-      event.preventDefault();
-    }
-  });
-
-  return elt("span", {class: "toolitem"}, "Layer: ", selectLayer);
-};
-
-
-function newLayer(panel)	{
-	var count = 1;
-	var canvas = elt("canvas", {class:"lowerCanvas", id:'Canvas' + count, width: 900, height: 500});
-	panel.appendChild(canvas);
-	count+=1;
-	
-}
-
-//document.querySelector('button').addEventListener("mousemove", newLayer(panel));
-
-//layers.NewLayer = newLayer(panel);
 
 //line tool helpers
 
-function relativePos(event, element) {
+function relativePos(event, element) {      //track the mouse position on the canvas
   var rect = element.getBoundingClientRect();
   return {x: Math.floor(event.clientX - rect.left),
           y: Math.floor(event.clientY - rect.top)};
 }
 
-function trackMouse(onPress, onMove, onEnd, onClick) {
+function eventControl(onPress, onMove, onEnd, onClick) { //automatically adds and removes event listeners
   function end(event) {
     removeEventListener("mousedown", onPress)
     removeEventListener("mousemove", onMove);
@@ -106,6 +77,19 @@ function trackMouse(onPress, onMove, onEnd, onClick) {
 
 //line tool helpers
 
+tools.Freehand = function(event, cx, onEnd) { //draw freehand
+  cx.lineCap = "round";
+
+  var pos = relativePos(event, cx.canvas);
+  eventControl(null, function(event) {
+    cx.beginPath();
+    cx.moveTo(pos.x, pos.y);
+    pos = relativePos(event, cx.canvas);
+    cx.lineTo(pos.x, pos.y);
+    cx.stroke();
+  }, onEnd);
+};
+
 tools.Line = function(event, cx, ucx) {
   ucx.lineCap = "round";
   cx.lineCap = "round";
@@ -113,7 +97,7 @@ tools.Line = function(event, cx, ucx) {
   var endX;
   var startY = 0;
   var endY;
-  trackMouse(function(event) {
+  eventControl(function(event) {
   	var pos = relativePos(event, ucx.canvas);
     startX=pos.x;
     startY=pos.y;
@@ -133,14 +117,83 @@ tools.Line = function(event, cx, ucx) {
     cx.moveTo(startX ,startY );
     cx.lineTo(pos.x, pos.y);
     cx.stroke();
-    //console.log(1);
     });
 };
 
-tools.Circle = function(event, cx, ucx)	{
+tools.Line2 = function(event, cx, ucx) { // joint click line
+  cx.lineCap = "round";
+  begin = function(event) {
+  			qos = relativePos(event, cx.canvas);
+    		cx.beginPath();
+    		cx.moveTo(qos.x, qos.y);
+    		removeEventListener("click", begin);
+    		addEventListener("mousedown", stop);
+  		}
+  stop = function(event) {
+  	qos = relativePos(event, cx.canvas);
+  	if (qos.x < 0 || qos.y < 0)	{
+  		removeEventListener("mousedown", stop);
+  		removeEventListener("click", begin);
+  		ucx.canvas.removeEventListener("mousedown", tools.Line2);
+  		return;
+  	}
+  	else	{
+    cx.lineTo(qos.x, qos.y);
+    cx.stroke();
+    	if (qos.x < 0 || qos.y < 0)	{
+  		removeEventListener("mousedown", stop);
+  		removeEventListener("click", begin);
+  		ucx.canvas.removeEventListener("mousedown", tools.Line2);
+  		return;
+		}
+    }
+    }
+  addEventListener("click", begin)
+  
+
+};
+
+tools.Curve = function(event, cx, ucx)	{ //draws a curve
+	ucx.lineCap = "round";
+	cx.lineCap = "round";
+  var startX = 0;
+  var endX = 0;
+  var startY = 0;
+  var endY = 0;
+  var cpX = 0;
+  var cpY = 0;
+  eventControl(function(event) {
+  	ucx.clearRect(0,0,cx.canvas.width,cx.canvas.height);
+  	var pos = relativePos(event, ucx.canvas);
+    startX=pos.x;
+    startY=pos.y;
+
+  },null, function(event) {
+    pos = relativePos(event, ucx.canvas);
+    endX = pos.x;
+    endY = pos.y;
+    ucx.beginPath();
+    ucx.moveTo(startX ,startY );
+    ucx.lineTo(endX, endY);
+    ucx.stroke();
+    eventControl(function(event) {
+    ucx.clearRect(0,0,cx.canvas.width,cx.canvas.height);
+  	var pos = relativePos(event, cx.canvas);
+    cpX=pos.x;
+    cpY=pos.y;
+    cx.beginPath();
+    cx.moveTo(startX, startY);
+    cx.quadraticCurveTo(cpX, cpY, endX, endY)
+    cx.stroke();}, null, null)
+  });
+ 
+   
+}
+
+tools.Circle = function(event, cx, ucx)	{ //draws a circle
 	var a = 0;
 	var b = 0;
-	trackMouse(function(event)	{
+	eventControl(function(event)	{
 		var pos=relativePos(event, ucx.canvas);
 		a = pos.x;
 		b = pos.y;
@@ -167,10 +220,10 @@ tools.Circle = function(event, cx, ucx)	{
 
 }
 
-tools.Triangle = function(event, cx, ucx)	{
+tools.Triangle = function(event, cx, ucx)	{ //draws a triangle
 	var a = 0;
 	var b = 0;
-	trackMouse(function(event)	{
+	eventControl(function(event)	{
 		var pos=relativePos(event, ucx.canvas);
 		a = pos.x;
 		b = pos.y;
@@ -197,119 +250,44 @@ tools.Triangle = function(event, cx, ucx)	{
 
 }
 
-tools.Curve = function(event, cx, ucx)	{
-	ucx.lineCap = "round";
-	cx.lineCap = "round";
-  var startX = 0;
-  var endX = 0;
-  var startY = 0;
-  var endY = 0;
-  var cpX = 0;
-  var cpY = 0;
-  trackMouse(function(event) {
-  	ucx.clearRect(0,0,cx.canvas.width,cx.canvas.height);
-  	var pos = relativePos(event, ucx.canvas);
-    startX=pos.x;
-    startY=pos.y;
-    //console.log(startX);
+tools.Text = function(event, cx) { // add a text to your background
+  var text = prompt("Text:", "");
+  if (text) {
+    var pos = relativePos(event, cx.canvas);
+    cx.font = Math.max(7, cx.lineWidth) + "px sans-serif";
+    cx.fillText(text, pos.x, pos.y);
+  }
+};
 
-  },null, function(event) {
-    pos = relativePos(event, ucx.canvas);
-    endX = pos.x;
-    endY = pos.y;
-    ucx.beginPath();
-    ucx.moveTo(startX ,startY );
-    //console.log(startX);
-    ucx.lineTo(endX, endY);
-    ucx.stroke();
-    trackMouse(function(event) {
-    ucx.clearRect(0,0,cx.canvas.width,cx.canvas.height);
-  	var pos = relativePos(event, cx.canvas);
-    cpX=pos.x;
-    cpY=pos.y;
-    //console.log(endX)
-    cx.beginPath();
-    cx.moveTo(startX, startY);
-    cx.quadraticCurveTo(cpX, cpY, endX, endY)
-    cx.stroke();
-    
-  }, null, null)
-   });
-   
-   
-   
-   
-
-}
-
-
-
-
-
-tools.Line2 = function(event, cx, ucx) {
-  cx.lineCap = "round";
-  var qos = relativePos(event, cx.canvas);
-  qos.x = -1;
-  qos.y = -1;
-  //var startX = 0;
-  //var endX;
-  //var startY = 0;
-  //var endY;
-  /*trackMouse(null, null, function(event) {
-    pos = relativePos(event, cx.canvas);
-    cx.lineTo(pos.x, pos.y);
-    cx.stroke();
-    }, function(event) {
-  	var pos = relativePos(event, cx.canvas);
-    startX=pos.x;
-    startY=pos.y;
-    console.log(pos.x);
-    cx.beginPath();
-    cx.moveTo(startX ,startY );
-  });*/
-  begin = function(event) {
-  			qos = relativePos(event, cx.canvas);
-    		//startX=pos.x;
-    		//startY=pos.y;
-    		cx.beginPath();
-    		cx.moveTo(qos.x, qos.y);
-    		removeEventListener("click", begin);
-    		addEventListener("mousedown", stop);
-  		}
-  stop = function(event) {
-  	qos = relativePos(event, cx.canvas);
-  	if (qos.x < 0 || qos.y < 0)	{
-  		removeEventListener("mousedown", stop);
-  	}
-  	else	{
-    cx.lineTo(qos.x, qos.y);
-    cx.stroke();
-    //console.log(pos.x)
-    removeEventListener("mousedown", stop);
-    }
-    }
-  addEventListener("click", begin)
+tools.Rectangle = function(event, cx, ucx) { // draw a rectangle
+  var pos = relativePos(event, ucx.canvas);
+  var pos1 = relativePos(event, ucx.canvas);
+  var a;
+  var b;
   
+  begin = function(event) {
+    pos1 = relativePos(event, ucx.canvas);
+    a = pos.x;
+    b = pos.y;
+    ucx.clearRect(0,0,cx.canvas.width,cx.canvas.height);
+    ucx.strokeRect(a,b,pos1.x - a, pos1.y - b);
+  };
+  end = function(event) {
+  	ucx.clearRect(0,0,cx.canvas.width,cx.canvas.height);
+    pos1 = relativePos(event, ucx.canvas);
+    cx.strokeRect(a,b,pos1.x - a, pos1.y - b);
+    removeEventListener('mousemove', begin);
+  	removeEventListener('mouseup', end);
 
+  };
+  addEventListener('mousemove', begin);
+  addEventListener('mouseup', end);
 };
 
 
-tools.Freehand = function(event, cx, onEnd) {
-  cx.lineCap = "round";
+tools.Fill = function(event, cx)	{ // fill with a color
 
-  var pos = relativePos(event, cx.canvas);
-  trackMouse(null, function(event) {
-    cx.beginPath();
-    cx.moveTo(pos.x, pos.y);
-    pos = relativePos(event, cx.canvas);
-    cx.lineTo(pos.x, pos.y);
-    cx.stroke();
-  }, onEnd);
-};
-
-tools.Fill = function(event, cx)	{
-
-trackMouse(function(event)	{
+eventControl(function(event)	{
 			pos=relativePos(event, cx.canvas);
 			var fillRGB = [hexToRed(cx.fillStyle), hexToGreen(cx.fillStyle), hexToBlue(cx.fillStyle), 255]
 			floodfill(pos.x, pos.y, fillRGB, cx, 900, 500);
@@ -324,7 +302,7 @@ function hexToGreen(hexColor) {
 function hexToBlue(hexColor) {
     return parseInt(hexColor.substring(5,7),16)}
 
-function floodfill(x,y,fillcolor,ctx,width,height,tolerance) {
+function floodfill(x,y,fillcolor,ctx,width,height) {
 	var img = ctx.getImageData(0,0,width,height);
 	var data = img.data;
 	var length = data.length;
@@ -332,29 +310,28 @@ function floodfill(x,y,fillcolor,ctx,width,height,tolerance) {
 	var i = (x+y*width)*4;
 	var e = i, w = i, me, mw, w2 = width*4;
 	var targetcolor = [data[i],data[i+1],data[i+2],data[i+3]];
-	var targettotal = data[i]+data[i+1]+data[i+2]+data[i+3];
- 
-	if(!pixelCompare(i,targetcolor,targettotal,fillcolor,data,length,tolerance)) { return false; }
+	 
+	if(!pixelCompare(i,targetcolor,fillcolor,data,length)) { return false; }
 	Q.push(i);
 	while(Q.length) {
 		i = Q.pop();
-		if(pixelCompareAndSet(i,targetcolor,targettotal,fillcolor,data,length,tolerance)) {
+		if(pixelCompareAndSet(i,targetcolor,fillcolor,data,length)) {
 			e = i;
 			w = i;
 			mw = parseInt(i/w2)*w2; //left bound
 			me = mw+w2;	//right bound			
-			while(mw<(w-=4) && pixelCompareAndSet(w,targetcolor,targettotal,fillcolor,data,length,tolerance)); //go left until edge hit
-			while(me>(e+=4) && pixelCompareAndSet(e,targetcolor,targettotal,fillcolor,data,length,tolerance)); //go right until edge hit
+			while(mw<(w-=4) && pixelCompareAndSet(w,targetcolor,fillcolor,data,length)); //go left until edge hit
+			while(me>(e+=4) && pixelCompareAndSet(e,targetcolor,fillcolor,data,length)); //go right until edge hit
 			for(var j=w;j<e;j+=4) {
-				if(j-w2>=0 		&& pixelCompare(j-w2,targetcolor,targettotal,fillcolor,data,length,tolerance)) Q.push(j-w2); //queue y-1
-				if(j+w2<length	&& pixelCompare(j+w2,targetcolor,targettotal,fillcolor,data,length,tolerance)) Q.push(j+w2); //queue y+1
+				if(j-w2>=0 		&& pixelCompare(j-w2,targetcolor,fillcolor,data,length)) Q.push(j-w2); //queue y-1
+				if(j+w2<length	&& pixelCompare(j+w2,targetcolor,fillcolor,data,length)) Q.push(j+w2); //queue y+1
 			} 			
 		}
 	}
 	ctx.putImageData(img,0,0);
 }
  
-function pixelCompare(i,targetcolor,targettotal,fillcolor,data,length,tolerance) {	
+function pixelCompare(i,targetcolor,fillcolor,data,length) {	
 	if (i<0||i>=length) return false; //out of bounds
 	if (data[i+3]===0)  return true;  //surface is invisible
 	
@@ -372,18 +349,11 @@ function pixelCompare(i,targetcolor,targettotal,fillcolor,data,length,tolerance)
 		(targetcolor[2] === data[i+2])
 	) return true; //target matches surface 
 	
-	if (
-		Math.abs(targetcolor[3] - data[i+3])<=(255-tolerance) &&
-		Math.abs(targetcolor[0] - data[i]  )<=tolerance && 
-		Math.abs(targetcolor[1] - data[i+1])<=tolerance &&
-		Math.abs(targetcolor[2] - data[i+2])<=tolerance
-	) return true; //target to surface within tolerance 
-	
 	return false; //no match
 }
  
-function pixelCompareAndSet(i,targetcolor,targettotal,fillcolor,data,length,tolerance) {
-	if(pixelCompare(i,targetcolor,targettotal,fillcolor,data,length,tolerance)) {
+function pixelCompareAndSet(i,targetcolor,fillcolor,data,length) {
+	if(pixelCompare(i,targetcolor,fillcolor,data,length)) {
 		//fill the color
 		data[i] = fillcolor[0];
 		data[i+1] = fillcolor[1];
@@ -398,40 +368,49 @@ function pixelCompareAndSet(i,targetcolor,targettotal,fillcolor,data,length,tole
 
 }
 
-tools.Erase = function(event, cx) {
+tools.Erase = function(event, cx) { //an eraser of course
   cx.globalCompositeOperation = "destination-out";
   tools.Freehand(event, cx, function() {
     cx.globalCompositeOperation = "source-over";
   });
 };
 
-controls.color = function(cx, ucx) {
-  var input = elt("input", {type: "color"});
-  input.addEventListener("change", function() {
-    cx.fillStyle = input.value;
-    cx.strokeStyle = input.value;
-    ucx.fillStyle = input.value;
-    ucx.strokeStyle = input.value;
-  });
-  return elt("span", {class: "toolitem"}, "Color: ", input);
-};
-
-controls.brushSize = function(cx, ucx) {
-  var select = elt("select");
+controls.brushSize = function(cx, ucx) { //set the size of your text or your brush
+  var select = makeElement("select");
   var sizes = [1, 2, 3, 5, 8, 12, 25, 35, 50, 75, 100];
   sizes.forEach(function(size) {
-    select.appendChild(elt("option", {value: size},
+    select.appendChild(makeElement("option", {value: size},
                            size + " pixels"));
   });
   select.addEventListener("change", function() {
     cx.lineWidth = select.value;
     ucx.lineWidth = select.value;
   });
-  return elt("span", {class: "toolitem"}, "Brush size: ", select);
+  return makeElement("span", {class: "toolitem"}, "Brush size: ", select);
 };
 
-controls.save = function(cx) {
-  var link = elt("a", {href: "/", class: "toolitem"}, "Save your work");
+controls.color = function(cx, ucx) {
+  var input = makeElement("input", {type: "color"});
+  input.addEventListener("change", function() {
+    cx.fillStyle = input.value;
+    cx.strokeStyle = input.value;
+    ucx.fillStyle = input.value;
+    ucx.strokeStyle = input.value;
+  });
+  return makeElement("span", {class: "toolitem"}, "Color: ", input);
+};
+
+controls.clear = function(cx, ucx) {
+  var clearCanvas = makeElement("button", {id:"clear", width: 30, height: 30}, "Clear");
+  clearCanvas.addEventListener("click", function() {
+    ucx.clearRect(0,0,cx.canvas.width,cx.canvas.height);
+    cx.clearRect(0,0,cx.canvas.width,cx.canvas.height);
+  });
+  return makeElement("span", {class: "toolitem"}, clearCanvas);
+};
+
+controls.save = function(cx) { // save your silly crap
+  var link = makeElement("a", {href: "/", class: "toolitem"}, "Save your work");
   function update() {
     try {
       link.href = cx.canvas.toDataURL().replace('image/png', 'image/octet-stream');
@@ -452,9 +431,7 @@ function loadImageURL(cx, url) {
   var image = document.createElement("img");
   image.addEventListener("load", function() {
     var color = cx.fillStyle, size = cx.lineWidth;
-    cx.canvas.width = image.width;
-    cx.canvas.height = image.height;
-    cx.drawImage(image, 0, 0);
+    cx.drawImage(image, 0, 0, 900, 500);
     cx.fillStyle = color;
     cx.strokeStyle = color;
     cx.lineWidth = size;
@@ -462,8 +439,8 @@ function loadImageURL(cx, url) {
   image.src = url;
 }
 
-controls.openFile = function(cx) {
-  var input = elt("input", {type: "file"});
+controls.openFile = function(cx) { // open an image as your background
+  var input = makeElement("input", {type: "file"});
   input.addEventListener("change", function() {
     if (input.files.length == 0) return;
     var reader = new FileReader();
@@ -472,48 +449,12 @@ controls.openFile = function(cx) {
     });
     reader.readAsDataURL(input.files[0]);
   });
-  return elt("div", {class: "toolitem"}, "Open image: ", input);
+  return makeElement("div", {class: "toolitem"}, "Open image: ", input);
 };
 
-tools.Text = function(event, cx) {
-  var text = prompt("Text:", "");
-  if (text) {
-    var pos = relativePos(event, cx.canvas);
-    cx.font = Math.max(7, cx.lineWidth) + "px sans-serif";
-    cx.fillText(text, pos.x, pos.y);
-  }
-};
-
-tools.Rectangle = function(event, cx, ucx) {
-  var pos = relativePos(event, ucx.canvas);
-  var pos1 = relativePos(event, ucx.canvas);
-  var a;
-  var b;
-  
-  begin = function(event) {
-    //cx.beginPath();
-    pos1 = relativePos(event, ucx.canvas);
-    //cx.moveTo(pos1.x, pos1.y);
-    a = pos.x;
-    b = pos.y;
-    ucx.clearRect(0,0,cx.canvas.width,cx.canvas.height);
-    ucx.strokeRect(a,b,pos1.x - a, pos1.y - b);
-  };
-  end = function(event) {
-  	ucx.clearRect(0,0,cx.canvas.width,cx.canvas.height);
-    pos1 = relativePos(event, ucx.canvas);
-    cx.strokeRect(a,b,pos1.x - a, pos1.y - b);
-    //cx.stroke();
-    removeEventListener('mousemove', begin);
-  	removeEventListener('mouseup', end);
-
-  };
-  addEventListener('mousemove', begin);
-  addEventListener('mouseup', end);
-};
 
 
 
 
 var x = document.querySelector("#center");
-createPaint(x);
+startPainting(x); //starts the code
